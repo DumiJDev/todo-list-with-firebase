@@ -1,12 +1,26 @@
 import { Delete } from "@mui/icons-material";
-import { Alert, AlertColor, Button, Card, CardContent, IconButton, Input, List, ListItemButton, Snackbar, TextareaAutosize, Tooltip } from "@mui/material";
-import { addDoc, collection, deleteDoc, doc, onSnapshot } from "firebase/firestore";
+import {
+  Alert,
+  AlertColor,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  IconButton,
+  Input,
+  List,
+  Snackbar,
+  TextareaAutosize,
+  Tooltip,
+} from "@mui/material";
+
 import { ChangeEvent, useEffect, useState } from "react";
 
-import db from "./configs/firebaseConfigs";
 import { ITaskModel } from "./models/TaskModel";
 
 import "./App.css";
+import { addTask, deleteTask, findAllTasks } from "./services/firestoreService";
+import { ListItem } from "./components";
 
 const styles = {
   display: "flex",
@@ -25,15 +39,6 @@ const initialStateTask = {
   isDone: false,
 };
 
-const cardStyle = {
-  boxShadow: "0 0 3px 0 rgba(0, 0, 0, 0.5)",
-  width: "95%",
-  marginBottom: "5px",
-  backgroundColor: "rgb(255, 255, 255)",
-  display: "flex",
-  justifyContent: "space-between",
-};
-
 const listStyle = {
   display: "flex",
   flexDirection: "column",
@@ -45,20 +50,35 @@ function App() {
   const [tasks, setTasks] = useState<ITaskModel[]>([]);
   const [task, setTask] = useState<ITaskModel>(initialStateTask);
   const [open, setOpen] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isDisable, setIsDisable] = useState<boolean>(false);
   const [severity, setSeverity] = useState<AlertColor>("success");
   const [message, setMessage] = useState<string>("");
   const [startAt, setStartAt] = useState<string>("");
   const [endAt, setEndAt] = useState<string>("");
 
   const handleSubmit = () => {
-    addDoc(collection(db, "tasks"), task).then((task) => {
-      setMessage('You add a task with successfully!!!')
-      setSeverity("success")
-      setOpen(true)
-    });
-    setTask(initialStateTask);
-    setStartAt("");
-    setEndAt("");
+    setIsLoading(true);
+    setIsDisable(true);
+
+    addTask(task)
+      .then((task) => {
+        setMessage(`You add a task with successfully!!!\n`);
+        setSeverity("success");
+        setOpen(true);
+        setTask(initialStateTask);
+        setStartAt("");
+        setEndAt("");
+        setIsLoading(false);
+        setIsDisable(false);
+      })
+      .catch((err) => {
+        setMessage(`Ops! Occured an error, i will work to solve`);
+        setSeverity("error");
+        setOpen(true);
+        setIsLoading(false);
+        setIsDisable(false);
+      });
   };
 
   const handleClose = () => {
@@ -66,10 +86,10 @@ function App() {
   };
 
   const handleDelete = (taskId: string) => {
-    deleteDoc(doc(db, "tasks", taskId)).then(task=> {
-      setMessage('The task (id = ' + taskId + ') was deleted with successfully!!!')
-      setSeverity("info")
-      setOpen(true)
+    deleteTask(taskId).then((task) => {
+      setMessage(`The task (id = ${taskId}) was deleted with successfully!!!`);
+      setSeverity("error");
+      setOpen(true);
     });
   };
 
@@ -89,15 +109,7 @@ function App() {
   };
 
   useEffect(() => {
-    onSnapshot(collection(db, "tasks"), (snapshot) => {
-      setTasks(
-        snapshot.docs.map((doc) => {
-          const task: ITaskModel = doc.data() as ITaskModel;
-          task.taskId = doc.id;
-          return task;
-        })
-      );
-    });
+    findAllTasks(setTasks);
   }, []);
 
   return (
@@ -105,25 +117,14 @@ function App() {
       <div className="list-tasks">
         <List sx={listStyle}>
           {tasks.map((task, index) => (
-            <ListItemButton
-              sx={{
-                ...cardStyle,
-                backgroundColor: task.isDone
-                  ? "lightgreen"
-                  : "lightgoldenrodyellow",
-              }}
-              key={index}
-              className="card-item"
-            >
-              <Tooltip title={task.description}>
-                <div>
-                  {task.title}
-                  <IconButton onClick={() => handleDelete(task.taskId)}>
-                    <Delete />
-                  </IconButton>
-                </div>
-              </Tooltip>
-            </ListItemButton>
+            <Tooltip title={task.description} key={index}>
+              <ListItem>
+                <div>{task.title}</div>
+                <IconButton onClick={() => handleDelete(task.taskId)}>
+                  <Delete color="error" />
+                </IconButton>
+              </ListItem>
+            </Tooltip>
           ))}
         </List>
       </div>
@@ -165,12 +166,12 @@ function App() {
               value={endAt}
             />
             <Button
-              type="button"
               onClick={handleSubmit}
               variant="contained"
               color="success"
+              disabled={isDisable}
             >
-              Save
+              {isLoading ? <CircularProgress /> : "Save"}
             </Button>
           </CardContent>
         </Card>
