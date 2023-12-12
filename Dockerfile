@@ -4,7 +4,7 @@ COPY . /app
 
 WORKDIR /app
 
-RUN yarn && npm i -g serve && yarn build
+RUN npm i && npm i -g serve && yarn build
 
 EXPOSE 3000
 
